@@ -14,10 +14,10 @@
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createMcpHandler } from "agents/mcp";
-import { any } from "zod";
 
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
+
 		const server = new McpServer({
 			name: "Dev Env",
 			version: "1.0",
@@ -25,11 +25,12 @@ export default {
 
 		registerAppResource(server, "Dev Widget", "ui://dev-widget", {description: "Dev Widget"},
 			async () => {
+				const html = await env.ASSETS.fetch(new URL("http://your-aledmana-worker.com/index.html"))
 				return {
 					contents: [
 						{
 							uri: "ui://dev-widget",
-							text: "coming soon",
+							text: await html.text(),
 							mimeType: RESOURCE_MIME_TYPE,
 						}
 					]
