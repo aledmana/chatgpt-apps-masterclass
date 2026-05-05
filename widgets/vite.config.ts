@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 
-const FULL_URL = "https://server.aledmana.workers.dev/";
+const FULL_URL = "https://flashcards-server.aledmana.workers.dev/";
 
 // https://vite.dev/config/
 export default defineConfig(({mode}) => {
