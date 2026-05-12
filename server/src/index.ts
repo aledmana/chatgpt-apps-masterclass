@@ -18,6 +18,28 @@ import z from "zod";
 
 const WIDGET_URI = "ui://flashcards-widget";
 
+const cardSchema = z.object(
+	{
+		front: z.string().describe("질문이나 프롬프트를 설명하는 내용"),
+		back: z.string().describe("정답 단어가 적혀있지."),
+		hint: z.string().describe("그 카드를 위한 힌트가 적혀있지."),
+		status: z.enum(['new', 'learning', 'mastered']).readonly().default('new'),
+	}
+)
+
+const deckSchema = z.object(
+	{
+		title: z.string().describe("카드뭉치의 테이틀이야. 예를들어, 'React Fundamentals'"),
+		description: z.string().describe("여기에는 카드뭉치의 내용에 대한 간단한 설명이 들어가."),
+		cards: z.array(
+			cardSchema,
+		).min(10).max(20).describe("플래시카드의 배열 (20개를 목표로 카드를 생성해 줘.)"),
+	}
+)
+
+type Deck = z.infer<typeof deckSchema>;
+type Card = z.infer<typeof cardSchema>;
+
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
 
@@ -60,15 +82,7 @@ export default {
 			description: "이 툴을 사용해서 공부용 플래시카드를 만들어줘. 20개의 카드를 생성하는데, 카드 앞면에는 질문을 넣고, 뒷면에는 정답을 넣고, 카드에 힌트로 추가해서 만들어줘. 이 툴을 사용하기 전에 유저에게 username을 물어봐.",
 			inputSchema: {
 				username: z.string().describe("사용자의 username이야. 이 툴을 사용하기 전에 이걸 요청해."),
-				title: z.string().describe("카드뭉치의 테이틀이야. 예를들어, 'React Fundamentals'"),
-				description: z.string().describe("여기에는 카드뭉치의 내용에 대한 간단한 설명이 들어가."),
-				cards: z.array(
-					z.object({
-						front: z.string().describe("질문이나 프롬프트를 설명하는 내용"),
-						back: z.string().describe("정답 단어가 적혀있지."),
-						hint: z.string().describe("그 카드를 위한 힌트가 적혀있지.")
-					}),
-				).min(10).max(20).describe("플래시카드의 배열 (20개를 목표로 카드를 생성해 줘.)")
+				deck: deckSchema,
 			},
 			annotations: {
 				readOnlyHint: false,
@@ -78,11 +92,11 @@ export default {
 					resourceUri: WIDGET_URI,
 				}
 			}
-		}, async ({title, description, cards, username}) => {
+		}, async ({deck:{title, description, cards}, username}) => {
 			const cardsWithIds = cards.map((card, index) => ({
 				id: `card-${Date.now()}-${index}`,
-				status: 'new',
 				...card,
+				status: 'new',
 			}));
 			const deck = {
 				id: `deck-${Date.now()}`,
@@ -118,6 +132,52 @@ export default {
 		});
 
 		// list decks
+		registerAppTool(server, "list-decks", {
+			title: "List Decks",
+			description: "사용자의 모든 카드뭉치를 보여주는 툴이다. 만약 아직 username을 받지 못했다면 이 툴을 사용하기 전에 사용자에게 username을 물어봐.",
+			inputSchema: {
+				username: z.string().describe("사용자의 username이야. 이 툴을 사용하기 전에 이걸 요청해."),
+			},
+			annotations: {
+				readOnlyHint: true,
+			},
+			_meta: {
+				ui: {
+					resourceUri: WIDGET_URI,
+				}
+			}
+		}, async ({username}) => {
+			const deckskey = `user:${username}:decks`;
+
+			const deckIds = await env.FLASHCARDS_KV.get<string[]>(deckskey, "json")
+
+			if(!deckIds || deckIds.length === 0) {
+				return {
+					content: [{ text: "보유 중인 카드 뭉치가 없습니다.", type: "text" }],
+					structuredContent: { decks: [] },
+				}
+			}
+
+			const decks = []
+
+			for (const deckId of deckIds) {
+				const deck = await env.FLASHCARDS_KV.get<Deck>(`user:${username}:deck:${deckId}`, "json");
+				if (deck) {
+					const masteredCount = deck.cards.filter(card => card.status === "mastered").length;
+					decks.push({ masteredCount, ...deck })
+				}
+			}
+	
+			return {
+				content: [
+					{
+						type: "text",
+						text: `총 ${decks.length}개의 ${JSON.stringify(decks)}를 찾았다.`,
+					}
+				],
+				structuredContent: { decks, username },
+			}
+		});
 
 		// open deck
 
