@@ -211,7 +211,7 @@ export default {
 				content: [
 					{
 						type: "text",
-						text: `${deck.description} 으로 공부 중인 ${deck.title} 열렸습니다. ${deck.cards}`,
+						text: `${deck.description} 으로 공부 중인 ${deck.title} 열렸습니다. ${JSON.stringify(deck.cards)}`,
 					}
 				],
 				structuredContent: { deck, username, deckId },
