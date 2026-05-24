@@ -20,6 +20,7 @@ const WIDGET_URI = "ui://flashcards-widget";
 
 const cardSchema = z.object(
 	{
+		id: z.string().readonly(),
 		front: z.string().describe("질문이나 프롬프트를 설명하는 내용"),
 		back: z.string().describe("정답 단어가 적혀있지."),
 		hint: z.string().describe("그 카드를 위한 힌트가 적혀있지."),
@@ -94,8 +95,8 @@ export default {
 			}
 		}, async ({deck:{title, description, cards}, username}) => {
 			const cardsWithIds = cards.map((card, index) => ({
-				id: `card-${Date.now()}-${index}`,
 				...card,
+				id: `card-${Date.now()}-${index}`,
 				status: 'new',
 			}));
 			const deck = {
@@ -219,8 +220,98 @@ export default {
 		});
 
 		// mark card (private)
+		registerAppTool(server, "mark-card", {
+			title: "Mark Card",
+			description: "카드의 상태값을 바꾸는 툴이다.",
+			inputSchema: {
+				username: z.string(),
+				deckId: z.string(),
+				status: z.enum(['learning', 'mastered']),
+				cardId: z.string(),
+			},
+			annotations: {
+				readOnlyHint: false,
+			},
+			_meta: {
+				ui: {
+					visibility: ['app'],
+				}
+			},
+		}, async ({username, deckId, cardId, status}) => {
+			const deckkey = `user:${username}:deck:${deckId}`;
+
+			const deck = await env.FLASHCARDS_KV.get<Deck>(deckkey, "json")
+
+			if (!deck) {
+				return {
+					content: [{ text: "Error not found", type: "text" }],
+					isError: true,
+				}
+			}
+
+			const card = deck.cards.find((card) => card.id === cardId)
+
+			if (card) {
+				card.status = status;
+			}
+
+			await env.FLASHCARDS_KV.put(deckId, JSON.stringify(deck));
+
+			return {
+				content: [
+					{
+						type: "text",
+						text: `${cardId} 카드는 ${status} 상태로 업데이트 되었습니다.`,
+					}
+				],
+				structuredContent: { deck },
+			}
+		});
 
 		// reset deck (private)
+		registerAppTool(server, "reset-deck", {
+			title: "Reset Deck",
+			description: "카드 뭉치의 공부 진도를 지셋하는 툴이다.",
+			inputSchema: {
+				username: z.string(),
+				deckId: z.string(),
+			},
+			annotations: {
+				destructiveHint: true,
+			},
+			_meta: {
+				ui: {
+					visibility: ['app'],
+				}
+			},
+		}, async ({username, deckId}) => {
+			const deckkey = `user:${username}:deck:${deckId}`;
+
+			const deck = await env.FLASHCARDS_KV.get<Deck>(deckkey, "json")
+
+			if (!deck) {
+				return {
+					content: [{ text: "Error not found", type: "text" }],
+					isError: true,
+				}
+			}
+			
+			for (const card of deck.cards) {
+				card.status = "new"
+			}
+
+			await env.FLASHCARDS_KV.put(deckId, JSON.stringify(deck));
+
+			return {
+				content: [
+					{
+						type: "text",
+						text: `카드 뭉치 공부 진도가 초기화되었습니다.`,
+					}
+				],
+				structuredContent: { deck },
+			}
+		});
 
 		// delete deck
 		registerAppTool(server, "delete-deck", {
@@ -231,7 +322,7 @@ export default {
 				deckId: z.string().describe("삭제할 카드 뭉치의 ID. 'list-decks' 툴을 통해서 deck ID를 얻을 수 있다.")
 			},
 			annotations: {
-				readOnlyHint: true,
+				destructiveHint: true,
 			},
 			_meta: {},
 		}, async ({username, deckId}) => {
