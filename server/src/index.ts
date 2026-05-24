@@ -180,12 +180,81 @@ export default {
 		});
 
 		// open deck
+		registerAppTool(server, "open-deck", {
+			title: "Open Deck",
+			description: "이 툴은 사용자가 공부할 카드 뭉치를 열어서 카드를 보여주는 툴이야. 만약 아직 username을 받지 못했다면 이 툴을 사용하기 전에 사용자에게 username을 물어봐. 공부할 카드 뭉치의 deck ID도 가지고 있어야 해.",
+			inputSchema: {
+				username: z.string().describe("사용자의 username이야. 이 툴을 사용하기 전에 이걸 요청해."),
+				deckId: z.string().describe("카드 뭉치의 ID. 'list-decks' 툴을 통해서 deck ID를 얻을 수 있다.")
+			},
+			annotations: {
+				readOnlyHint: true,
+			},
+			_meta: {
+				ui: {
+					resourceUri: WIDGET_URI,
+				}
+			}
+		}, async ({username, deckId}) => {
+			const deckkey = `user:${username}:deck:${deckId}`;
+
+			const deck = await env.FLASHCARDS_KV.get<Deck>(deckkey, "json")
+
+			if (!deck) {
+				return {
+					content: [{ text: "카드 뭉치를 찾을 수 없습니다..", type: "text" }],
+					structuredContent: { decks: [] },
+				}
+			}
+
+			return {
+				content: [
+					{
+						type: "text",
+						text: `${deck.description} 으로 공부 중인 ${deck.title} 열렸습니다. ${deck.cards}`,
+					}
+				],
+				structuredContent: { deck, username, deckId },
+			}
+		});
 
 		// mark card (private)
 
 		// reset deck (private)
 
 		// delete deck
+		registerAppTool(server, "delete-deck", {
+			title: "Delete Deck",
+			description: "이 툴은 카드 뭉치를 삭제하는 툴이야. 만약 아직 username을 받지 못했다면 이 툴을 사용하기 전에 사용자에게 username을 물어봐. 공부할 카드 뭉치의 deck ID도 가지고 있어야 해.",
+			inputSchema: {
+				username: z.string().describe("사용자의 username이야. 이 툴을 사용하기 전에 이걸 요청해."),
+				deckId: z.string().describe("삭제할 카드 뭉치의 ID. 'list-decks' 툴을 통해서 deck ID를 얻을 수 있다.")
+			},
+			annotations: {
+				readOnlyHint: true,
+			},
+			_meta: {},
+		}, async ({username, deckId}) => {
+			const deckkey = `user:${username}:deck:${deckId}`;
+
+			const deck = await env.FLASHCARDS_KV.get<Deck>(deckkey, "json")
+
+			if (!deck) {
+				return {
+					content: [{ text: "카드 뭉치를 찾을 수 없습니다..", type: "text" }],
+				}
+			}
+			await env.FLASHCARDS_KV.delete(deckkey);
+
+			return {
+				content: [
+					{
+						type: "text",
+						text: `선택한 카드 뭉치를 삭제하였습니다.`,
+					}
+				],
+			}
+		});
 
 		const handler = createMcpHandler(server);
 
