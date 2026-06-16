@@ -255,7 +255,7 @@ export default {
 				card.status = status;
 			}
 
-			await env.FLASHCARDS_KV.put(deckId, JSON.stringify(deck));
+			await env.FLASHCARDS_KV.put(deckkey, JSON.stringify(deck));
 
 			return {
 				content: [
@@ -300,7 +300,7 @@ export default {
 				card.status = "new"
 			}
 
-			await env.FLASHCARDS_KV.put(deckId, JSON.stringify(deck));
+			await env.FLASHCARDS_KV.put(deckkey, JSON.stringify(deck));
 
 			return {
 				content: [
